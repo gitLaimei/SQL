@@ -1,0 +1,72 @@
+--- check for delete table…
+
+if exists (select * from sysobjects where name = '#Temp_table')
+begin
+	drop table '#Temp_table')
+end
+
+----Get next # from end
+
+SELECT top 100 [SiteKey],[NodeKey],
+right([NodeKey], PATINDEX('%[a-z]%', reverse([NodeKey]))-1)
+FROM [Nodes]
+
+
+--Recursive CTE
+
+select top 10 CHARINDEX('; ', OS_Patches) , sitekey, OS_Patches, LEN(os_patches) from dbo.vw_HB_SysCheckMSG
+
+
+;WITH test (SITEKEY, lft, rght, idx)
+AS 
+(
+        SELECT t.SITEKEY
+                ,case when CHARINDEX(';', t.OS_Patches) = 0 and LEN(t.OS_Patches) > 0 then t.OS_Patches ELSE
+                    LEFT(t.OS_Patches, CHARINDEX(';', t.OS_Patches) ) END
+                ,case when CHARINDEX(';', t.OS_Patches) = 0 and LEN(t.OS_Patches) > 0 then '' else
+                SUBSTRING(t.OS_Patches, CHARINDEX(';', t.OS_Patches), LEN(t.OS_Patches)) END
+                ,0
+        FROM vw_HB_SysCheckMSG t
+        where t.OS_Patches is not null
+        UNION ALL
+        SELECT c.SITEKEY
+                ,CASE WHEN CHARINDEX(';', c.rght) = 0 THEN c.rght ELSE LEFT(c.rght, CHARINDEX(';', c.rght) - 1) END
+                ,CASE WHEN CHARINDEX(';', c.rght) > 0 THEN SUBSTRING(c.rght, CHARINDEX(';', c.rght) + 2, LEN(c.rght)) 
+                        ELSE '' END
+               ,idx + 1
+        FROM test c 
+        WHERE LEN(c.rght) > 0
+)
+
+
+select TOP 10 * from test order by SITEKEY, idx option (maxrecursion 365);
+
+
+CREATE TABLE #tmp (id int, string varchar(1000))
+
+INSERT INTO #tmp (id, string)
+SELECT 1, 'abcd, efgh, ijkl, mnop, qrst, uvwx, yz' UNION ALL
+SELECT 2, 'zyxw, vuts, rqpo, nmlk, jihg, fedc, ba' UNION ALL
+SELECT 3, 'the, quick, brown, fox, jumped, over, the, lazy, dog'
+
+;WITH test (id, lft, rght, idx)
+AS 
+(
+	SELECT t.id
+		,LEFT(t.string, CHARINDEX(', ', t.string) - 1)
+		,SUBSTRING(t.string, CHARINDEX(', ', t.string) + 2, DATALENGTH(t.string))
+		,0
+	FROM #tmp t
+	UNION ALL
+	SELECT c.id
+		,CASE WHEN CHARINDEX(', ', c.rght) = 0 THEN c.rght ELSE LEFT(c.rght, CHARINDEX(', ', c.rght) - 1) END
+		,CASE WHEN CHARINDEX(', ', c.rght) > 0 THEN SUBSTRING(c.rght, CHARINDEX(', ', c.rght) + 2, DATALENGTH(c.rght)) 
+			ELSE '' END
+		,idx + 1
+	FROM test c 
+	WHERE DATALENGTH(c.rght) > 0
+)
+
+select * from test order by id, idx
+
+DROP TABLE #tmp
